@@ -5,12 +5,23 @@
 :root {
   font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
   background-color: #f9fafb;
+  color-scheme: light dark;
+}
+
+.dark :root {
+  background-color: #030712;
 }
 
 body {
   margin: 0;
   padding: 0;
   color: #1f2937;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dark body {
+  background-color: #030712;
+  color: #f9fafb;
 }
 
 #root {

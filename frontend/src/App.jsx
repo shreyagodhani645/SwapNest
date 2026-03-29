@@ -12,6 +12,8 @@ import EditListing from './pages/EditListing';
 import Wishlist from './pages/Wishlist';
 import Chat from './pages/Chat';
 import Profile from './pages/Profile';
+import AdminLogin from './pages/AdminLogin';
+import AdminDashboard from './pages/AdminDashboard';
 import './index.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -22,19 +24,40 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+const AdminProtectedRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return <Navigate to="/admin/login" replace />;
+  }
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.role !== 'admin') {
+      return <Navigate to="/admin/login" replace />;
+    }
+  } catch {
+    return <Navigate to="/admin/login" replace />;
+  }
+  return children;
+};
+
 const App = () => {
   return (
     <Router>
-      <div className="bg-background min-h-screen selection:bg-primary/30 font-sans tracking-tight">
+      <div className="bg-background dark:bg-gray-950 min-h-screen selection:bg-primary/30 font-sans tracking-tight transition-colors duration-300">
         <Toaster 
-          position="top-center"
+          position="bottom-right"
           toastOptions={{
+            duration: 3000,
             style: {
               borderRadius: '1rem',
               background: '#333',
               color: '#fff',
               fontWeight: 'bold',
             },
+          }}
+          containerStyle={{
+            bottom: 40,
+            right: 20,
           }}
         />
         <Routes>
@@ -45,7 +68,7 @@ const App = () => {
           <Route path="/listings/create" element={<ProtectedRoute><CreateListing /></ProtectedRoute>} />
           <Route path="/listings/edit/:id" element={<ProtectedRoute><EditListing /></ProtectedRoute>} />
           <Route path="/listings/:id" element={<ListingDetail />} />
-          <Route path="/profile/:userId" element={<Profile />} />
+          <Route path="/profile/:userId" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           
           <Route 
             path="/my-listings" 
@@ -80,6 +103,9 @@ const App = () => {
               </ProtectedRoute>
             } 
           />
+          
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
           
           <Route path="/" element={<Navigate to="/home" replace />} />
         </Routes>

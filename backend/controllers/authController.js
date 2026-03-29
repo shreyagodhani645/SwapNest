@@ -35,22 +35,28 @@ const login = async (req, res) => {
     }
 
     try {
-        const sql = `SELECT ID, USERNAME, EMAIL, PASSWORD FROM USERS WHERE EMAIL = :email`;
+        const sql = `SELECT ID, USERNAME, EMAIL, PASSWORD, PHONE, PROFILE_PICTURE, ROLE, IS_BANNED FROM USERS WHERE EMAIL = :email`;
         const result = await db.execute(sql, { email }, { outFormat: require('oracledb').OUT_FORMAT_OBJECT });
 
         if (result.rows.length === 0) {
-            return res.status(401).json({ message: 'Invalid credentials' });
+            return res.status(404).json({ message: 'Username does not exist, please sign up' });
         }
 
         const user = result.rows[0];
+
+        // Check if user is banned
+        if (user.IS_BANNED === 1) {
+            return res.status(403).json({ message: 'Your account has been banned. Contact admin for support.' });
+        }
+
         const isMatch = await bcrypt.compare(password, user.PASSWORD);
 
         if (!isMatch) {
-            return res.status(401).json({ message: 'Invalid credentials' });
+            return res.status(401).json({ message: 'Incorrect credentials (wrong password)' });
         }
 
         const token = jwt.sign(
-            { id: user.ID, username: user.USERNAME, email: user.EMAIL },
+            { id: user.ID, username: user.USERNAME, email: user.EMAIL, role: user.ROLE || 'user' },
             process.env.JWT_SECRET,
             { expiresIn: '24h' }
         );
@@ -58,7 +64,7 @@ const login = async (req, res) => {
         res.json({
             message: 'Login successful',
             token,
-            user: { id: user.ID, username: user.USERNAME, email: user.EMAIL }
+            user: { id: user.ID, username: user.USERNAME, email: user.EMAIL, phone: user.PHONE || '', PROFILE_PICTURE: user.PROFILE_PICTURE || '', role: user.ROLE || 'user' }
         });
     } catch (err) {
         if (err.code === 'NJS-503' || err.message.includes('ECONNREFUSED')) {

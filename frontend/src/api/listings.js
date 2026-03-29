@@ -9,4 +9,5 @@ export const listingsApi = {
   update: (id, data) => api.put(`/listings/${id}`, data),
   createCategory: (data) => api.post('/categories', data),
   deleteListing: (id) => api.delete(`/listings/${id}`),
+  updateStatus: (id, status) => api.patch(`/listings/${id}/status`, { status }),
 };

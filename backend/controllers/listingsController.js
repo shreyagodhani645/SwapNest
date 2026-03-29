@@ -1,3 +1,6 @@
+const db = require('../db');
+const oracledb = require('oracledb');
+
 const deleteListing = async (req, res) => {
     const { id } = req.params;
     const sellerId = Number(req.user.id);
@@ -26,17 +29,17 @@ const deleteListing = async (req, res) => {
         res.status(500).json({ message: 'Error deleting listing', error: err.message });
     }
 };
-const db = require('../db');
-const oracledb = require('oracledb');
+
 
 const getListings = async (req, res) => {
-    const { category, search } = req.query;
+    const { category, search, minPrice, maxPrice, location, condition, sort, showSold, excludeId } = req.query;
     let sql = `
         SELECT l.ID, 
                l.TITLE, 
                l.PRICE, 
-               l.CONDITION, 
+               l.ITEM_CONDITION, 
                l.LOCATION,
+               l.STATUS,
                c.NAME AS CATEGORY_NAME, 
                MIN(i.IMAGE_URL) AS IMAGE_URL
         FROM LISTINGS l
@@ -45,6 +48,16 @@ const getListings = async (req, res) => {
         WHERE 1=1
     `;
     const binds = {};
+
+    // By default, hide sold/reserved unless showSold is true
+    if (showSold !== 'true') {
+        sql += ` AND (l.STATUS = 'active' OR l.STATUS IS NULL)`;
+    }
+
+    if (excludeId) {
+        sql += ` AND l.ID != :excludeId`;
+        binds.excludeId = Number(excludeId);
+    }
 
     if (category) {
         sql += ` AND c.NAME = :category`;
@@ -56,8 +69,36 @@ const getListings = async (req, res) => {
         binds.search = `%${search.toLowerCase()}%`;
     }
 
-    sql += ` GROUP BY l.ID, l.TITLE, l.PRICE, l.CONDITION, l.LOCATION, c.NAME, l.CREATED_AT`;
-    sql += ` ORDER BY l.CREATED_AT DESC`;
+    if (minPrice) {
+        sql += ` AND l.PRICE >= :minPrice`;
+        binds.minPrice = Number(minPrice);
+    }
+
+    if (maxPrice) {
+        sql += ` AND l.PRICE <= :maxPrice`;
+        binds.maxPrice = Number(maxPrice);
+    }
+
+    if (location) {
+        sql += ` AND LOWER(l.LOCATION) LIKE :location`;
+        binds.location = `%${location.toLowerCase()}%`;
+    }
+
+    if (condition) {
+        sql += ` AND l.ITEM_CONDITION = :condition`;
+        binds.condition = condition;
+    }
+
+    sql += ` GROUP BY l.ID, l.TITLE, l.PRICE, l.ITEM_CONDITION, l.LOCATION, l.STATUS, c.NAME, l.CREATED_AT`;
+
+    // Sort options
+    if (sort === 'price_asc') {
+        sql += ` ORDER BY l.PRICE ASC`;
+    } else if (sort === 'price_desc') {
+        sql += ` ORDER BY l.PRICE DESC`;
+    } else {
+        sql += ` ORDER BY l.CREATED_AT DESC`;
+    }
 
     try {
         const result = await db.execute(sql, binds, { outFormat: oracledb.OUT_FORMAT_OBJECT });
@@ -70,24 +111,29 @@ const getListings = async (req, res) => {
 
 const getListingById = async (req, res) => {
     const { id } = req.params;
+    console.log('DEBUG: Backend getListingById received ID:', id, 'Type:', typeof id);
+    
     const listingSql = `
         SELECT l.*, c.NAME as CATEGORY_NAME, u.USERNAME as SELLER_NAME, u.EMAIL as SELLER_EMAIL
         FROM LISTINGS l
-        JOIN CATEGORIES c ON l.CATEGORY_ID = c.ID
-        JOIN USERS u ON l.SELLER_ID = u.ID
+        LEFT JOIN CATEGORIES c ON l.CATEGORY_ID = c.ID
+        LEFT JOIN USERS u ON l.SELLER_ID = u.ID
         WHERE l.ID = :id
     `;
     
     const imagesSql = `SELECT IMAGE_URL FROM IMAGES WHERE LISTING_ID = :id`;
 
     try {
-        const listingResult = await db.execute(listingSql, { id }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        console.log('DEBUG: Running listing query with bind:', { id: Number(id) || id });
+        const listingResult = await db.execute(listingSql, { id: Number(id) || id }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
         
+        console.log('DEBUG: Query result row count:', listingResult.rows.length);
         if (listingResult.rows.length === 0) {
+            console.log('DEBUG: No listing found for ID:', id);
             return res.status(404).json({ message: 'Listing not found' });
         }
 
-        const imagesResult = await db.execute(imagesSql, { id }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const imagesResult = await db.execute(imagesSql, { id: Number(id) || id }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
         
         const listing = listingResult.rows[0];
         listing.IMAGES = imagesResult.rows.map(img => img.IMAGE_URL);
@@ -123,8 +169,8 @@ const createListing = async (req, res) => {
 
     try {
         const sql = `
-            INSERT INTO LISTINGS (TITLE, DESCRIPTION, PRICE, LOCATION, CONDITION, CATEGORY_ID, SELLER_ID)
-            VALUES (:title, :description, :price, :location, :condition, :categoryId, :sellerId)
+            INSERT INTO LISTINGS (TITLE, DESCRIPTION, PRICE, LOCATION, ITEM_CONDITION, CATEGORY_ID, SELLER_ID, STATUS)
+            VALUES (:title, :description, :price, :location, :condition, :categoryId, :sellerId, 'active')
             RETURNING ID INTO :id
         `;
         
@@ -203,7 +249,7 @@ const updateListing = async (req, res) => {
                 DESCRIPTION = :description, 
                 PRICE = :price, 
                 LOCATION = :location, 
-                CONDITION = :condition, 
+                ITEM_CONDITION = :condition, 
                 CATEGORY_ID = :categoryId
             WHERE ID = :id
         `;
@@ -245,6 +291,36 @@ const updateListing = async (req, res) => {
     }
 };
 
+// FEATURE 2: Update listing status (active/sold/reserved)
+const updateListingStatus = async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    const sellerId = Number(req.user.id);
+
+    if (!['active', 'sold', 'reserved'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status. Must be active, sold, or reserved.' });
+    }
+
+    try {
+        const checkSql = `SELECT SELLER_ID FROM LISTINGS WHERE ID = :id`;
+        const checkResult = await db.execute(checkSql, { id }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        
+        if (checkResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Listing not found' });
+        }
+
+        if (checkResult.rows[0].SELLER_ID !== sellerId) {
+            return res.status(403).json({ message: 'Forbidden: not your listing' });
+        }
+
+        await db.execute(`UPDATE LISTINGS SET STATUS = :status WHERE ID = :id`, { status, id });
+        res.json({ message: `Listing marked as ${status}` });
+    } catch (err) {
+        console.error('Error updating listing status:', err);
+        res.status(500).json({ message: 'Error updating listing status', error: err.message });
+    }
+};
+
 const getCategories = async (req, res) => {
     try {
         const result = await db.execute(`SELECT * FROM CATEGORIES ORDER BY NAME`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
@@ -262,7 +338,7 @@ const getMyListings = async (req, res) => {
         return res.status(400).json({ message: 'Invalid user token: missing id in JWT payload.' });
     }
     const sql = `
-        SELECT l.ID, l.TITLE, l.PRICE, l.CONDITION, l.LOCATION, c.NAME AS CATEGORY_NAME,
+        SELECT l.ID, l.TITLE, l.PRICE, l.ITEM_CONDITION, l.LOCATION, l.STATUS, c.NAME AS CATEGORY_NAME,
                (SELECT MIN(i.IMAGE_URL) FROM IMAGES i WHERE i.LISTING_ID = l.ID) AS IMAGE_URL
         FROM LISTINGS l
         JOIN CATEGORIES c ON l.CATEGORY_ID = c.ID
@@ -278,4 +354,4 @@ const getMyListings = async (req, res) => {
     }
 };
 
-module.exports = { getListings, getListingById, createListing, getCategories, getMyListings, deleteListing, updateListing };
+module.exports = { getListings, getListingById, createListing, getCategories, getMyListings, deleteListing, updateListing, updateListingStatus };

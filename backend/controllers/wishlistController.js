@@ -2,8 +2,8 @@ const db = require('../db');
 const oracledb = require('oracledb');
 
 const addToWishlist = async (req, res) => {
-    const userId = parseInt(req.user.id);
-    const listing_id = parseInt(req.body.listing_id);
+    const userId = Number(req.user.id);
+    const listing_id = Number(req.body.listing_id);
 
     if (!listing_id) return res.status(400).json({ message: 'Listing ID is required' });
 
@@ -27,34 +27,36 @@ const addToWishlist = async (req, res) => {
 };
 
 const checkWishlist = async (req, res) => {
-    const userId = req.user.id;
-    const { listing_id } = req.params;
+    const userId = Number(req.user.id);
+    const listing_id = Number(req.params.listing_id);
 
     try {
         const checkSql = `SELECT * FROM WISHLIST WHERE USER_ID = :userId AND LISTING_ID = :listing_id`;
         const checkResult = await db.execute(checkSql, { userId, listing_id });
         res.json({ isWishlisted: checkResult.rows.length > 0 });
     } catch (err) {
+        console.error('Error checking wishlist:', err);
         res.status(500).json({ message: 'Error checking wishlist', error: err.message });
     }
 };
 
 const removeFromWishlist = async (req, res) => {
-    const userId = req.user.id;
-    const { listing_id } = req.params;
+    const userId = Number(req.user.id);
+    const listing_id = Number(req.params.listing_id);
 
     try {
         await db.execute(`DELETE FROM WISHLIST WHERE USER_ID = :userId AND LISTING_ID = :listing_id`, { userId, listing_id });
         res.json({ message: 'Removed from wishlist' });
     } catch (err) {
+        console.error('Error removing from wishlist:', err);
         res.status(500).json({ message: 'Error removing from wishlist', error: err.message });
     }
 };
 
 const getWishlist = async (req, res) => {
-    const userId = req.user.id;
+    const userId = Number(req.user.id);
     const sql = `
-        SELECT l.ID, l.TITLE, l.PRICE, l.LOCATION AS CONDITION,
+        SELECT l.ID, l.TITLE, l.PRICE, l.ITEM_CONDITION AS CONDITION,
                (SELECT MIN(i.IMAGE_URL) FROM IMAGES i WHERE i.LISTING_ID = l.ID) as IMAGE_URL
         FROM WISHLIST w
         JOIN LISTINGS l ON w.LISTING_ID = l.ID
@@ -66,6 +68,7 @@ const getWishlist = async (req, res) => {
         const result = await db.execute(sql, { userId }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
         res.json(result.rows);
     } catch (err) {
+        console.error('Error fetching wishlist:', err);
         res.status(500).json({ message: 'Error fetching wishlist', error: err.message });
     }
 };

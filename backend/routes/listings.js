@@ -1,17 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const listingsController = require('../controllers/listingsController');
-const verifyToken = require('../middleware/authMiddleware');
+const authMiddleware = require('../middleware/authMiddleware');
 const upload = require('../middleware/upload');
 
-
-router.get('/', listingsController.getListings);
-router.get('/my-listings', verifyToken, listingsController.getMyListings);
+// Public routes
 router.get('/categories', listingsController.getCategories);
-
+router.get('/my-listings', authMiddleware, listingsController.getMyListings);
 router.get('/:id', listingsController.getListingById);
-router.post('/', verifyToken, upload.single('image'), listingsController.createListing);
-router.put('/:id', verifyToken, upload.single('image'), listingsController.updateListing);
-router.delete('/:id', verifyToken, listingsController.deleteListing);
+router.get('/', listingsController.getListings);
+
+// Protected routes  
+router.post('/', authMiddleware, upload.single('image'), listingsController.createListing);
+router.put('/:id', authMiddleware, upload.single('image'), listingsController.updateListing);
+router.delete('/:id', authMiddleware, listingsController.deleteListing);
+router.patch('/:id/status', authMiddleware, listingsController.updateListingStatus);
 
 module.exports = router;
