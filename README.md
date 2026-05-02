@@ -2,7 +2,7 @@
 
 SwapNest is a premium marketplace app for swapping and trading items, built with React, Node.js, and **Oracle Database**.
 
-## 🔐 Login Credentials
+## 🔐 Login credentials
 
 ### Admin Login
 - **Email/Username**: `admin@swapnest.com`
