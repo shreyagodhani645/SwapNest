@@ -12,17 +12,18 @@ SwapNest is a premium marketplace app for swapping and trading items, built with
 ## 🔐 Demo Login Credentials
 
 ### User Logins
-All demo users use the password `password123`. You can log in with either username or email.
+You can log in with either username or email. Each demo user has its own password:
 
 | Username | Email | Password |
 | :--- | :--- | :--- |
-| `alice_w` | alice@example.com | `password123` |
-| `bob_m` | bob@example.com | `password123` |
-| `charlie_d` | charlie@example.com | `password123` |
-| `diana_p` | diana@example.com | `password123` |
-| `emma_r` | emma@example.com | `password123` |
+| `alice_w` | alice@example.com | `alicePass123` |
+| `bob_m` | bob@example.com | `bobPass123` |
+| `charlie_d` | charlie@example.com | `charliePass123` |
+| `diana_p` | diana@example.com | `dianaPass123` |
+| `emma_r` | emma@example.com | `emmaPass123` |
+| `frank_g` | frank@example.com | `frankPass123` |
 
-These accounts come with pre-seeded listings (active, sold, and reserved), offers in various states, wishlist entries, and a sample chat thread — useful for demonstrating every feature without manual setup.
+These accounts come with pre-seeded listings (active, sold, and reserved) across all categories, offers in multiple states (pending, accepted, rejected — including competing offers on the same listing), wishlist entries, and sample chat threads — useful for demonstrating every feature without manual setup.
 
 ### Admin Login
 An admin account exists (`admin@swapnest.com`) with full platform management rights, including the ability to ban/delete users and remove any listing. Credentials are available on request — they are intentionally not published here since this repository is public.
