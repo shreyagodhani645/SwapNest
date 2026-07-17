@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { listingsApi } from '../api/listings';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
+import { API_BASE_URL } from '../config';
 
 const EditListing = () => {
   const { id } = useParams();
@@ -28,8 +29,6 @@ const EditListing = () => {
 
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-
-  const API_BASE_URL = 'http://localhost:5000';
 
   const handleChange = (e) => {
     const { name, value } = e.target;

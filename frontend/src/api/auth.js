@@ -1,10 +1,11 @@
 import axios from 'axios';
-
-const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
-});
-
 import toast from 'react-hot-toast';
+
+// Uses VITE_API_URL in production (set in Vercel env vars),
+// falls back to localhost for local development.
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+});
 
 // Add token to requests if it exists
 api.interceptors.request.use((config) => {

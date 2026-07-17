@@ -4,6 +4,7 @@ import { chatApi } from '../api/chat';
 import { io } from 'socket.io-client';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
+import { API_BASE_URL } from '../config';
 
 const Chat = () => {
   const location = useLocation();
@@ -26,7 +27,7 @@ const Chat = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
     
-    const newSocket = io('http://localhost:5000', {
+    const newSocket = io(API_BASE_URL, {
         auth: { token }
     });
     setSocket(newSocket);

@@ -5,6 +5,7 @@ import { userApi } from '../api/users';
 import { wishlistApi } from '../api/wishlist';
 import ListingCard from '../components/ListingCard';
 import Navbar from '../components/Navbar';
+import { API_BASE_URL } from '../config';
 
 const Profile = () => {
   const { userId } = useParams();
@@ -98,7 +99,7 @@ const Profile = () => {
             <div className="relative">
                 <div className="h-40 w-40 bg-primary rounded-[3rem] flex items-center justify-center text-white text-6xl font-black shadow-2xl shadow-primary/30 border-8 border-white dark:border-gray-800 overflow-hidden">
                 {profile.PROFILE_PICTURE ? (
-                  <img src={profile.PROFILE_PICTURE.startsWith('http') ? profile.PROFILE_PICTURE : `http://localhost:5000${profile.PROFILE_PICTURE}`} alt={profile.USERNAME} className="h-full w-full object-cover" />
+                  <img src={profile.PROFILE_PICTURE.startsWith('http') ? profile.PROFILE_PICTURE : `${API_BASE_URL}${profile.PROFILE_PICTURE}`} alt={profile.USERNAME} className="h-full w-full object-cover" />
                 ) : (
                   profile.USERNAME[0].toUpperCase()
                 )}
@@ -214,7 +215,7 @@ const EditProfileModal = ({ isOpen, onClose, user, onUpdate }) => {
   const [profileFile, setProfileFile] = useState(null);
   const [profilePreview, setProfilePreview] = useState(
     user.PROFILE_PICTURE 
-      ? (user.PROFILE_PICTURE.startsWith('http') ? user.PROFILE_PICTURE : `http://localhost:5000${user.PROFILE_PICTURE}`) 
+      ? (user.PROFILE_PICTURE.startsWith('http') ? user.PROFILE_PICTURE : `${API_BASE_URL}${user.PROFILE_PICTURE}`) 
       : ''
   );
   const [loading, setLoading] = useState(false);

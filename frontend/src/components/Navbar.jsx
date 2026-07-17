@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { Sun } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -101,7 +102,7 @@ const Navbar = () => {
                 >
                   <div className="h-8 w-8 bg-primary-light rounded-full flex items-center justify-center text-white text-[10px] overflow-hidden">
                     {user?.PROFILE_PICTURE ? (
-                      <img src={user.PROFILE_PICTURE.startsWith('http') ? user.PROFILE_PICTURE : `http://localhost:5000${user.PROFILE_PICTURE}`} alt={user?.username || 'User'} className="h-full w-full object-cover" />
+                      <img src={user.PROFILE_PICTURE.startsWith('http') ? user.PROFILE_PICTURE : `${API_BASE_URL}${user.PROFILE_PICTURE}`} alt={user?.username || 'User'} className="h-full w-full object-cover" />
                     ) : (
                       user?.username?.[0]?.toUpperCase() || '?'
                     )}

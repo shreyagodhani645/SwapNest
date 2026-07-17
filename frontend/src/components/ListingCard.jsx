@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-const API_BASE_URL = 'http://localhost:5000';
+import { API_BASE_URL } from '../config';
 
 const ListingCard = ({ listing, isWishlisted, onToggleWishlist }) => {
   const isSold = listing.STATUS === 'sold';

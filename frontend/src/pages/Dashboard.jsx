@@ -3,6 +3,7 @@ import Navbar from '../components/Navbar';
 import { useNavigate } from 'react-router-dom';
 import { offersApi } from '../api/offers';
 import toast from 'react-hot-toast';
+import { API_BASE_URL } from '../config';
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -41,7 +42,7 @@ const Dashboard = () => {
                     <div className="flex flex-col md:flex-row items-center gap-10 mb-16 pb-12 border-b border-gray-100 dark:border-gray-800">
                         <div className="h-32 w-32 bg-primary rounded-[2.5rem] flex items-center justify-center text-white text-5xl font-black shadow-2xl shadow-primary/30 border-8 border-primary-light dark:border-gray-800 overflow-hidden">
                             {user?.PROFILE_PICTURE ? (
-                                <img src={user.PROFILE_PICTURE.startsWith('http') ? user.PROFILE_PICTURE : `http://localhost:5000${user.PROFILE_PICTURE}`} alt={user.username} className="h-full w-full object-cover" />
+                                <img src={user.PROFILE_PICTURE.startsWith('http') ? user.PROFILE_PICTURE : `${API_BASE_URL}${user.PROFILE_PICTURE}`} alt={user.username} className="h-full w-full object-cover" />
                             ) : (
                                 user?.username?.[0]?.toUpperCase() || '?'
                             )}

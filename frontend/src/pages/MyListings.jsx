@@ -3,8 +3,7 @@ import { offersApi } from '../api/offers';
 import { listingsApi } from '../api/listings';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
-
-const API_BASE_URL = 'http://localhost:5000';
+import { API_BASE_URL } from '../config';
 
 const MyListings = () => {
   const [myListings, setMyListings] = useState([]);

@@ -7,8 +7,7 @@ import OfferModal from '../components/OfferModal';
 import ListingCard from '../components/ListingCard';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
-
-const API_BASE_URL = 'http://localhost:5000';
+import { API_BASE_URL } from '../config';
 
 const ListingDetail = () => {
   const { id } = useParams();
