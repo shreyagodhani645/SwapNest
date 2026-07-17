@@ -280,9 +280,13 @@ const AdminDashboard = () => {
       {/* Navigation */}
       <nav style={s.nav}>
         <div style={s.navInner}>
-          <div style={s.logo}>
-            <div style={s.logoIcon}>🛡️</div>
-            <span style={s.logoText}>SwapNest <span style={s.logoAccent}>Admin</span></span>
+          <div className="flex items-center group">
+            <div className="h-10 w-10 bg-primary rounded-xl flex items-center justify-center transform transition-all group-hover:rotate-12 shadow-lg shadow-primary/20">
+              <span className="text-white font-black text-2xl">S</span>
+            </div>
+            <span className="ml-3 text-2xl font-black text-white tracking-tight group-hover:text-primary transition-colors">
+              Swap<span className="text-primary italic">Nest</span>
+            </span>
           </div>
           <div style={s.navRight}>
             <span style={s.navUser}>Signed in as <span style={s.navUserBold}>{user?.username}</span></span>
