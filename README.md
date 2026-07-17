@@ -1,18 +1,31 @@
 # SwapNest
 
-SwapNest is a premium marketplace app for swapping and trading items, built with React, Node.js, and **Oracle Database**.
+SwapNest is a premium marketplace app for swapping and trading items, built with React, Node.js, and **PostgreSQL (Supabase)**.
 
-## 🔐 Login credentials
+## 🌐 Live Demo
+
+- **Frontend**: [https://swap-nest-weld.vercel.app](https://swap-nest-weld.vercel.app)
+- **Backend API**: [https://swapnest-nwv9.onrender.com](https://swapnest-nwv9.onrender.com)
+
+> Note: the backend is hosted on Render's free tier, which spins down after periods of inactivity. The first request after idle time may take 30–60 seconds to respond while the server wakes up.
+
+## 🔐 Demo Login Credentials
+
+### User Logins
+All demo users use the password `password123`. You can log in with either username or email.
+
+| Username | Email | Password |
+| :--- | :--- | :--- |
+| `alice_w` | alice@example.com | `password123` |
+| `bob_m` | bob@example.com | `password123` |
+| `charlie_d` | charlie@example.com | `password123` |
+| `diana_p` | diana@example.com | `password123` |
+| `emma_r` | emma@example.com | `password123` |
+
+These accounts come with pre-seeded listings (active, sold, and reserved), offers in various states, wishlist entries, and a sample chat thread — useful for demonstrating every feature without manual setup.
 
 ### Admin Login
-- **Email/Username**: `admin@swapnest.com`
-- **Password**: `admin123`
-- **Login URL**: [http://localhost:5173/admin/login](http://localhost:5173/admin/login)
-
-### User Login
-- **Username**: `alice_w` (or `alice@example.com`)
-- **Password**: `password123`
-- **Other Demo Users**: `bob_m`, `charlie_d`, `diana_p` (all use `password123`)
+An admin account exists (`admin@swapnest.com`) with full platform management rights, including the ability to ban/delete users and remove any listing. Credentials are available on request — they are intentionally not published here since this repository is public.
 
 ## Project Structure
 
@@ -20,7 +33,6 @@ SwapNest is a premium marketplace app for swapping and trading items, built with
 DBMS/
 ├── backend/           # Node.js/Express backend
 │   ├── controllers/   # Route controllers
-│   ├── middleware/    # Express middleware
 │   ├── routes/        # API route definitions
 │   ├── uploads/       # Uploaded files
 │   ├── *.js           # Backend scripts
@@ -30,80 +42,72 @@ DBMS/
 │   ├── src/           # React source code
 │   ├── public/        # Static assets
 │   └── package.json   # Frontend dependencies
-├── index.html         # Project landing page
-├── package.json       # Project-level dependencies (if any)
-└── README.md          # Project documentation
+└── README.md
 ```
 
-## Prerequisites
+## Prerequisites (Local Development)
 
-* **Node.js**: Installed on your system.
-* **Oracle Database**: Running locally (default port: `1521`, SID: `XE` or `ORCLCDB`).
-* **Environment**: A `.env` file in the `backend` folder with your Oracle DB credentials.
-
-## Quick Start (Windows)
-
-1.  **Run the Startup Script**:
-    Double-click `run_swapnest.bat` in the root directory.
-    This will automatically start both the backend and frontend in separate windows.
+- **Node.js** installed on your system
+- A **Supabase** (PostgreSQL) project, or any PostgreSQL instance
+- A `.env` file in the `backend` folder with your database connection string and JWT secret
 
 ## Manual Setup
 
 ### 1. Database Setup
 
-Run the following SQL scripts in your Oracle DB using SQL Developer or SQL*Plus:
-1. `backend/full_schema.sql` (Creates base tables/sequences)
-2. `backend/advanced_schema.sql` (Adds complex relations/stored procs)
-3. `backend/dbms_objects.sql` (Adds functions/triggers/indexes)
-4. `backend/seed_data.sql` (Seeds dummy data)
-5. `node backend/create_admin.js` (Creates the admin user)
+Run `backend/full_schema.sql` in your PostgreSQL instance (via Supabase's SQL Editor or `psql`) to create tables, functions, and triggers.
 
-### 2. Troubleshooting (Common Issues)
+To populate demo data (users, listings, offers, wishlist, chat messages), run `backend/seed_demo_data.sql` — it's safe to re-run, as every insert checks for existing data first.
 
+### 2. Backend
 
-#### **"Database is offline" or 500/503 Errors**
-This usually means the backend cannot connect to Oracle.
-1.  **Check Oracle**: Ensure your Oracle service is **Running**.
-2.  **Check Connection String**: Verify `DB_CONNECT_STRING` in `backend/.env` match your setup (e.g., `localhost:1521/XEPDB1`).
-
-
-#### **"Table or view does not exist"**
-This means the tables aren't created yet.
-- Run the SQL scripts in `backend/` as mentioned above.
-
-
-### 3. Backend
 ```bash
 cd backend
 npm install
-# Configure .env
-node setup_db.js   # Initializes DB schema
-node server.js     # Starts backend server
+# Configure .env with DB_CONNECTION_STRING and JWT_SECRET
+npm start
 ```
 
-### 4. Frontend
+### 3. Frontend
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
+By default the frontend points at `http://localhost:5000/api`. To point it at a deployed backend instead, set `VITE_API_URL` in a `.env` file inside `frontend/`.
+
+## Troubleshooting
+
+**"Database is offline" or 500/503 errors**
+Usually means the backend can't reach PostgreSQL. Check that `DB_CONNECTION_STRING` in `backend/.env` is correct and that your Supabase project is active.
+
+**"Network error" on the frontend**
+If deployed, confirm `VITE_API_URL` (frontend) and `FRONTEND_URL` (backend, for CORS) are both set correctly and point to each other's live URLs.
+
 ## Features
-- **Auth**: Secure login/signup with JWT.
-- **Marketplace**: Browse, search, and filter listings.
-- **Wishlist**: Save items for later.
-- **Chat**: Real-time messaging between users.
-- **Offers**: Make and track price offers.
-- **Trust Score**: Dynamic reputation system.
-- **Premium UI**: Modern purple theme with smooth transitions.
+
+- **Auth**: Secure login/signup with JWT, supports login via email or username
+- **Marketplace**: Browse, search, and filter listings
+- **Wishlist**: Save items for later
+- **Chat**: Real-time messaging between users via WebSockets
+- **Offers**: Make and track price offers, with accept/reject flow
+- **Admin Dashboard**: User management, listing moderation, category stats, audit logs
+- **Trust Score**: Dynamic reputation system based on activity
+- **Premium UI**: Modern purple theme with dark mode support
 
 ## Technologies Used
-- **Backend:** Node.js, Express, Oracle DB
-- **Frontend:** React, Vite, Tailwind CSS
-- **Other:** JWT for authentication, Multer for file uploads, WebSockets for chat
+
+- **Backend**: Node.js, Express, PostgreSQL (via Supabase), Socket.io
+- **Frontend**: React, Vite, Tailwind CSS
+- **Deployment**: Render (backend), Vercel (frontend)
+- **Other**: JWT for authentication, Multer for file uploads, bcrypt for password hashing
 
 ## Contributing
+
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
 ## License
+
 This project is for educational purposes.
