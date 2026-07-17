@@ -1,5 +1,4 @@
 const db = require('../db');
-const oracledb = require('oracledb');
 
 const deleteListing = async (req, res) => {
     const { id } = req.params;
@@ -10,7 +9,7 @@ const deleteListing = async (req, res) => {
     try {
         // Check ownership
         const checkSql = `SELECT SELLER_ID FROM LISTINGS WHERE ID = :id`;
-        const checkResult = await db.execute(checkSql, { id }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const checkResult = await db.execute(checkSql, { id });
         if (checkResult.rows.length === 0) {
             return res.status(404).json({ message: 'Listing not found' });
         }
@@ -101,7 +100,7 @@ const getListings = async (req, res) => {
     }
 
     try {
-        const result = await db.execute(sql, binds, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const result = await db.execute(sql, binds);
         res.json(result.rows);
     } catch (err) {
         console.error('Error fetching listings:', err);
@@ -112,7 +111,7 @@ const getListings = async (req, res) => {
 const getListingById = async (req, res) => {
     const { id } = req.params;
     console.log('DEBUG: Backend getListingById received ID:', id, 'Type:', typeof id);
-    
+
     const listingSql = `
         SELECT l.*, c.NAME as CATEGORY_NAME, u.USERNAME as SELLER_NAME, u.EMAIL as SELLER_EMAIL
         FROM LISTINGS l
@@ -120,24 +119,24 @@ const getListingById = async (req, res) => {
         LEFT JOIN USERS u ON l.SELLER_ID = u.ID
         WHERE l.ID = :id
     `;
-    
+
     const imagesSql = `SELECT IMAGE_URL FROM IMAGES WHERE LISTING_ID = :id`;
 
     try {
         console.log('DEBUG: Running listing query with bind:', { id: Number(id) || id });
-        const listingResult = await db.execute(listingSql, { id: Number(id) || id }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
-        
+        const listingResult = await db.execute(listingSql, { id: Number(id) || id });
+
         console.log('DEBUG: Query result row count:', listingResult.rows.length);
         if (listingResult.rows.length === 0) {
             console.log('DEBUG: No listing found for ID:', id);
             return res.status(404).json({ message: 'Listing not found' });
         }
 
-        const imagesResult = await db.execute(imagesSql, { id: Number(id) || id }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
-        
+        const imagesResult = await db.execute(imagesSql, { id: Number(id) || id });
+
         const listing = listingResult.rows[0];
         listing.IMAGES = imagesResult.rows.map(img => img.IMAGE_URL);
-        
+
         res.json(listing);
     } catch (err) {
         console.error('Error fetching listing details:', err);
@@ -149,14 +148,14 @@ const createListing = async (req, res) => {
     console.log('--- Create Listing Request ---');
     console.log('Body:', req.body);
     console.log('File:', req.file);
-    
+
     if (!req.body) {
         return res.status(400).json({ message: 'Request body is missing. Ensure multipart/form-data is being sent correctly.' });
     }
-    
+
     const { title, description, price, location, condition, categoryId } = req.body;
     const sellerId = Number(req.user.id);
-    
+
     if (!sellerId) {
         console.error('JWT payload missing id:', req.user);
         return res.status(400).json({ message: 'Invalid user token: missing id in JWT payload.' });
@@ -168,28 +167,27 @@ const createListing = async (req, res) => {
     }
 
     try {
+        // Postgres RETURNING ID — no OUT-bind needed, read straight from result.rows[0]
         const sql = `
             INSERT INTO LISTINGS (TITLE, DESCRIPTION, PRICE, LOCATION, ITEM_CONDITION, CATEGORY_ID, SELLER_ID, STATUS)
             VALUES (:title, :description, :price, :location, :condition, :categoryId, :sellerId, 'active')
-            RETURNING ID INTO :id
+            RETURNING ID
         `;
-        
-        // Convert to proper types for Oracle
+
         const binds = {
-            title, 
-            description, 
-            price: Number(price), 
-            location, 
-            condition, 
-            categoryId: Number(categoryId), 
-            sellerId,
-            id: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
+            title,
+            description,
+            price: Number(price),
+            location,
+            condition,
+            categoryId: Number(categoryId),
+            sellerId
         };
 
         console.log('Executing INSERT with binds:', binds);
         const result = await db.execute(sql, binds);
 
-        const listingId = result.outBinds.id[0];
+        const listingId = result.rows[0].ID;
         console.log('Created listing with ID:', listingId);
 
         // Handle image upload from multer
@@ -204,9 +202,6 @@ const createListing = async (req, res) => {
         res.status(201).json({ message: 'Listing created successfully', id: listingId });
     } catch (err) {
         console.error('Error creating listing. Full error:', err);
-        if (err && err.errorNum && err.message) {
-            console.error('Oracle DB Error Details:', err.errorNum, err.message);
-        }
         res.status(500).json({ message: 'Error creating listing', error: err.message, details: err });
     }
 };
@@ -232,8 +227,8 @@ const updateListing = async (req, res) => {
     try {
         // Check ownership
         const checkSql = `SELECT SELLER_ID FROM LISTINGS WHERE ID = :id`;
-        const checkResult = await db.execute(checkSql, { id }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
-        
+        const checkResult = await db.execute(checkSql, { id });
+
         if (checkResult.rows.length === 0) {
             return res.status(404).json({ message: 'Listing not found' });
         }
@@ -253,14 +248,14 @@ const updateListing = async (req, res) => {
                 CATEGORY_ID = :categoryId
             WHERE ID = :id
         `;
-        
+
         const binds = {
-            title, 
-            description, 
-            price: Number(price), 
-            location, 
-            condition, 
-            categoryId: Number(categoryId), 
+            title,
+            description,
+            price: Number(price),
+            location,
+            condition,
+            categoryId: Number(categoryId),
             id: Number(id)
         };
 
@@ -303,8 +298,8 @@ const updateListingStatus = async (req, res) => {
 
     try {
         const checkSql = `SELECT SELLER_ID FROM LISTINGS WHERE ID = :id`;
-        const checkResult = await db.execute(checkSql, { id }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
-        
+        const checkResult = await db.execute(checkSql, { id });
+
         if (checkResult.rows.length === 0) {
             return res.status(404).json({ message: 'Listing not found' });
         }
@@ -323,7 +318,7 @@ const updateListingStatus = async (req, res) => {
 
 const getCategories = async (req, res) => {
     try {
-        const result = await db.execute(`SELECT * FROM CATEGORIES ORDER BY NAME`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const result = await db.execute(`SELECT * FROM CATEGORIES ORDER BY NAME`, []);
         res.json(result.rows);
     } catch (err) {
         console.error('Error fetching categories:', err);
@@ -346,7 +341,7 @@ const getMyListings = async (req, res) => {
         ORDER BY l.CREATED_AT DESC
     `;
     try {
-        const result = await db.execute(sql, { sellerId }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const result = await db.execute(sql, { sellerId });
         res.json(result.rows);
     } catch (err) {
         console.error('Error fetching my listings:', err);

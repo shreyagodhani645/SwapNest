@@ -1,5 +1,4 @@
 const db = require('../db');
-const oracledb = require('oracledb');
 
 // POST /api/offers — Create a new offer
 const createOffer = async (req, res) => {
@@ -13,7 +12,7 @@ const createOffer = async (req, res) => {
     try {
         // Get seller ID from listing
         const listingSql = `SELECT SELLER_ID, STATUS FROM LISTINGS WHERE ID = :listing_id`;
-        const listingResult = await db.execute(listingSql, { listing_id: Number(listing_id) }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const listingResult = await db.execute(listingSql, { listing_id: Number(listing_id) });
 
         if (listingResult.rows.length === 0) {
             return res.status(404).json({ message: 'Listing not found' });
@@ -29,16 +28,15 @@ const createOffer = async (req, res) => {
             return res.status(400).json({ message: 'You cannot make an offer on your own listing' });
         }
 
-        // Use both AMOUNT and OFFER_PRICE columns since DB has both
+        // Schema only has OFFER_PRICE (no AMOUNT column) — fixed from previous version
         const sql = `
-            INSERT INTO OFFERS (LISTING_ID, BUYER_ID, SELLER_ID, AMOUNT, OFFER_PRICE, STATUS)
-            VALUES (:listing_id, :buyerId, :sellerId, :amount, :offerPrice, 'pending')
+            INSERT INTO OFFERS (LISTING_ID, BUYER_ID, SELLER_ID, OFFER_PRICE, STATUS)
+            VALUES (:listing_id, :buyerId, :sellerId, :offerPrice, 'pending')
         `;
-        await db.execute(sql, { 
-            listing_id: Number(listing_id), 
-            buyerId, 
-            sellerId: listing.SELLER_ID, 
-            amount: Number(amount),
+        await db.execute(sql, {
+            listing_id: Number(listing_id),
+            buyerId,
+            sellerId: listing.SELLER_ID,
             offerPrice: Number(amount)
         });
 
@@ -61,43 +59,26 @@ const updateOfferStatus = async (req, res) => {
 
     try {
         if (status === 'accepted') {
-            // Try stored procedure first
-            try {
-                const result = await db.execute(
-                    `BEGIN SP_ACCEPT_OFFER(:offerId, :sellerId, :result); END;`,
-                    {
-                        offerId: Number(id),
-                        sellerId: userId,
-                        result: { type: oracledb.STRING, dir: oracledb.BIND_OUT, maxSize: 500 }
-                    }
-                );
-                const msg = result.outBinds.result;
-                if (msg.startsWith('ERROR')) {
-                    return res.status(400).json({ message: msg });
-                }
-                return res.json({ message: msg });
-            } catch (spErr) {
-                // Fallback if stored procedure doesn't exist or is invalid
-                console.log('SP_ACCEPT_OFFER not available, using manual SQL:', spErr.message);
-                const checkSql = `SELECT SELLER_ID, LISTING_ID FROM OFFERS WHERE ID = :id`;
-                const checkResult = await db.execute(checkSql, { id: Number(id) }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
-                if (checkResult.rows.length === 0) return res.status(404).json({ message: 'Offer not found' });
-                if (checkResult.rows[0].SELLER_ID !== userId) return res.status(403).json({ message: 'Only the seller can update this offer' });
+            // Oracle SP_ACCEPT_OFFER OUT-bind call removed — not supported by the
+            // Postgres db.js shim. Using the manual SQL path directly instead.
+            const checkSql = `SELECT SELLER_ID, LISTING_ID FROM OFFERS WHERE ID = :id`;
+            const checkResult = await db.execute(checkSql, { id: Number(id) });
+            if (checkResult.rows.length === 0) return res.status(404).json({ message: 'Offer not found' });
+            if (checkResult.rows[0].SELLER_ID !== userId) return res.status(403).json({ message: 'Only the seller can update this offer' });
 
-                const listingId = checkResult.rows[0].LISTING_ID;
-                await db.execute(`UPDATE OFFERS SET STATUS = 'accepted' WHERE ID = :id`, { id: Number(id) });
-                // Reject competing offers (handle both cases of pending)
-                await db.execute(
-                    `UPDATE OFFERS SET STATUS = 'rejected' WHERE LISTING_ID = :listingId AND ID != :id AND LOWER(STATUS) = 'pending'`, 
-                    { listingId, id: Number(id) }
-                );
-                await db.execute(`UPDATE LISTINGS SET STATUS = 'reserved' WHERE ID = :listingId`, { listingId });
-                return res.json({ message: 'Offer accepted, competing offers rejected' });
-            }
+            const listingId = checkResult.rows[0].LISTING_ID;
+            await db.execute(`UPDATE OFFERS SET STATUS = 'accepted' WHERE ID = :id`, { id: Number(id) });
+            // Reject competing offers
+            await db.execute(
+                `UPDATE OFFERS SET STATUS = 'rejected' WHERE LISTING_ID = :listingId AND ID != :id AND LOWER(STATUS) = 'pending'`,
+                { listingId, id: Number(id) }
+            );
+            await db.execute(`UPDATE LISTINGS SET STATUS = 'reserved' WHERE ID = :listingId`, { listingId });
+            return res.json({ message: 'Offer accepted, competing offers rejected' });
         } else {
             // Rejection
             const checkSql = `SELECT SELLER_ID FROM OFFERS WHERE ID = :id`;
-            const checkResult = await db.execute(checkSql, { id: Number(id) }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+            const checkResult = await db.execute(checkSql, { id: Number(id) });
             if (checkResult.rows.length === 0) return res.status(404).json({ message: 'Offer not found' });
             if (checkResult.rows[0].SELLER_ID !== userId) return res.status(403).json({ message: 'Only the seller can update this offer' });
 
@@ -116,8 +97,8 @@ const getMyListingsOffers = async (req, res) => {
 
     try {
         const sql = `
-            SELECT o.ID, o.LISTING_ID, o.BUYER_ID, 
-                   COALESCE(o.OFFER_PRICE, o.AMOUNT) AS AMOUNT, 
+            SELECT o.ID, o.LISTING_ID, o.BUYER_ID,
+                   o.OFFER_PRICE AS AMOUNT,
                    o.STATUS, o.CREATED_AT,
                    u.USERNAME AS BUYER_NAME, l.TITLE AS LISTING_TITLE
             FROM OFFERS o
@@ -126,7 +107,7 @@ const getMyListingsOffers = async (req, res) => {
             WHERE o.SELLER_ID = :userId
             ORDER BY o.CREATED_AT DESC
         `;
-        const result = await db.execute(sql, { userId }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const result = await db.execute(sql, { userId });
         res.json(result.rows);
     } catch (err) {
         console.error('Error fetching offers:', err);
@@ -140,8 +121,8 @@ const getMySentOffers = async (req, res) => {
 
     try {
         const sql = `
-            SELECT o.ID, o.LISTING_ID, 
-                   COALESCE(o.OFFER_PRICE, o.AMOUNT) AS AMOUNT, 
+            SELECT o.ID, o.LISTING_ID,
+                   o.OFFER_PRICE AS AMOUNT,
                    o.STATUS, o.CREATED_AT,
                    l.TITLE AS LISTING_TITLE, l.PRICE AS LISTING_PRICE,
                    u.USERNAME AS SELLER_NAME
@@ -151,7 +132,7 @@ const getMySentOffers = async (req, res) => {
             WHERE o.BUYER_ID = :userId
             ORDER BY o.CREATED_AT DESC
         `;
-        const result = await db.execute(sql, { userId }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const result = await db.execute(sql, { userId });
         res.json(result.rows);
     } catch (err) {
         console.error('Error fetching sent offers:', err);

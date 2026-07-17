@@ -2,7 +2,6 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
-const oracledb = require('oracledb');
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
@@ -56,32 +55,30 @@ io.on('connection', (socket) => {
         const { listingId, receiverId, content } = data;
         const senderId = Number(socket.user.id);
         try {
-            // Use SENT_AT (actual column name in DB), not CREATED_AT
             const sql = `
                 INSERT INTO MESSAGES (LISTING_ID, SENDER_ID, RECEIVER_ID, CONTENT)
                 VALUES (:listingId, :senderId, :receiverId, :content)
-                RETURNING ID, SENT_AT INTO :id, :sent_at
+                RETURNING ID, CREATED_AT
             `;
             const binds = {
-                listingId: Number(listingId), 
-                senderId, 
-                receiverId: Number(receiverId), 
-                content,
-                id: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT },
-                sent_at: { type: oracledb.TIMESTAMP, dir: oracledb.BIND_OUT }
+                listingId: Number(listingId),
+                senderId,
+                receiverId: Number(receiverId),
+                content
             };
             const result = await db.execute(sql, binds);
-            
+            const inserted = result.rows[0];
+
             const newMessage = {
-                ID: result.outBinds.id[0],
+                ID: inserted.ID,
                 LISTING_ID: Number(listingId),
                 SENDER_ID: senderId,
                 RECEIVER_ID: Number(receiverId),
                 CONTENT: content,
-                CREATED_AT: result.outBinds.sent_at[0], // alias for frontend compatibility
+                CREATED_AT: inserted.CREATED_AT,
                 SENDER_NAME: socket.user.username
             };
-            
+
             const roomName = `chat_${listingId}_${Math.min(senderId, Number(receiverId))}_${Math.max(senderId, Number(receiverId))}`;
             io.to(roomName).emit('receive_message', newMessage);
         } catch (err) {
@@ -117,13 +114,11 @@ app.get('/api/health', (req, res) => {
 });
 
 // ===== Admin/Debug: View database tables =====
-// List all tables
 app.get('/api/admin/tables', async (req, res) => {
     try {
         const result = await db.execute(
-            `SELECT TABLE_NAME FROM USER_TABLES ORDER BY TABLE_NAME`,
-            [],
-            { outFormat: oracledb.OUT_FORMAT_OBJECT }
+            `SELECT TABLE_NAME FROM information_schema.tables WHERE table_schema = 'public' ORDER BY TABLE_NAME`,
+            {}
         );
         res.json({ tables: result.rows.map(r => r.TABLE_NAME) });
     } catch (err) {
@@ -133,13 +128,9 @@ app.get('/api/admin/tables', async (req, res) => {
 
 // View all rows in a table (for debugging)
 app.get('/api/admin/tables/:name', async (req, res) => {
-    const tableName = req.params.name.toUpperCase().replace(/[^A-Z0-9_]/g, ''); // sanitize
+    const tableName = req.params.name.toLowerCase().replace(/[^a-z0-9_]/g, ''); // sanitize
     try {
-        const result = await db.execute(
-            `SELECT * FROM ${tableName}`,
-            [],
-            { outFormat: oracledb.OUT_FORMAT_OBJECT }
-        );
+        const result = await db.execute(`SELECT * FROM ${tableName}`, {});
         res.json({ table: tableName, rowCount: result.rows.length, rows: result.rows });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -149,9 +140,9 @@ app.get('/api/admin/tables/:name', async (req, res) => {
 // ===== Global Error Handler — catches all unhandled errors =====
 app.use((err, req, res, next) => {
     console.error('Unhandled server error:', err);
-    res.status(500).json({ 
-        message: 'Internal server error', 
-        error: process.env.NODE_ENV === 'production' ? 'Something went wrong' : err.message 
+    res.status(500).json({
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'production' ? 'Something went wrong' : err.message
     });
 });
 

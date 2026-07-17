@@ -1,5 +1,4 @@
 const db = require('../db');
-const oracledb = require('oracledb');
 
 // ============================================================
 // DASHBOARD STATS (Uses VW_ADMIN_PLATFORM_OVERVIEW view)
@@ -10,16 +9,16 @@ const getDashboardStats = async (req, res) => {
     try {
         const result = await db.execute(
             `SELECT * FROM VW_ADMIN_PLATFORM_OVERVIEW`,
-            [], { outFormat: oracledb.OUT_FORMAT_OBJECT }
+            []
         );
         
         if (result.rows.length === 0) {
             // Fallback to manual queries if view doesn't exist
             const [usersRes, listingsRes, offersRes, messagesRes] = await Promise.all([
-                db.execute(`SELECT COUNT(*) AS COUNT FROM USERS`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT }),
-                db.execute(`SELECT COUNT(*) AS COUNT FROM LISTINGS`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT }),
-                db.execute(`SELECT COUNT(*) AS COUNT FROM OFFERS`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT }),
-                db.execute(`SELECT COUNT(*) AS COUNT FROM MESSAGES`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT })
+                db.execute(`SELECT COUNT(*) AS COUNT FROM USERS`, []),
+                db.execute(`SELECT COUNT(*) AS COUNT FROM LISTINGS`, []),
+                db.execute(`SELECT COUNT(*) AS COUNT FROM OFFERS`, []),
+                db.execute(`SELECT COUNT(*) AS COUNT FROM MESSAGES`, [])
             ]);
             return res.json({
                 users: usersRes.rows[0].COUNT,
@@ -51,10 +50,10 @@ const getDashboardStats = async (req, res) => {
         // Fallback if view doesn't exist yet
         try {
             const [usersRes, listingsRes, offersRes, messagesRes] = await Promise.all([
-                db.execute(`SELECT COUNT(*) AS COUNT FROM USERS`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT }),
-                db.execute(`SELECT COUNT(*) AS COUNT FROM LISTINGS`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT }),
-                db.execute(`SELECT COUNT(*) AS COUNT FROM OFFERS`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT }),
-                db.execute(`SELECT COUNT(*) AS COUNT FROM MESSAGES`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT })
+                db.execute(`SELECT COUNT(*) AS COUNT FROM USERS`, []),
+                db.execute(`SELECT COUNT(*) AS COUNT FROM LISTINGS`, []),
+                db.execute(`SELECT COUNT(*) AS COUNT FROM OFFERS`, []),
+                db.execute(`SELECT COUNT(*) AS COUNT FROM MESSAGES`, [])
             ]);
             res.json({
                 users: usersRes.rows[0].COUNT, listings: listingsRes.rows[0].COUNT,
@@ -88,7 +87,7 @@ const getAllUsers = async (req, res) => {
 
         sql += ` ORDER BY CREATED_AT DESC`;
 
-        const result = await db.execute(sql, binds, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const result = await db.execute(sql, binds);
         res.json(result.rows);
     } catch (err) {
         // Fallback if view doesn't exist
@@ -104,7 +103,7 @@ const getAllUsers = async (req, res) => {
                 binds.search = `%${search.toLowerCase()}%`;
             }
             sql += ` ORDER BY u.CREATED_AT DESC`;
-            const result = await db.execute(sql, binds, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+            const result = await db.execute(sql, binds);
             res.json(result.rows);
         } catch (fallbackErr) {
             res.status(500).json({ message: 'Error fetching users', error: fallbackErr.message });
@@ -119,14 +118,13 @@ const deleteUser = async (req, res) => {
     try {
         // Try using stored procedure first
         const result = await db.execute(
-            `BEGIN SP_DELETE_USER_CASCADE(:userId, :adminId, :result); END;`,
+            `SELECT fn_delete_user_cascade(:userId, :adminId) AS result`,
             {
                 userId: Number(id),
-                adminId: Number(adminId),
-                result: { type: oracledb.STRING, dir: oracledb.BIND_OUT, maxSize: 500 }
+                adminId: Number(adminId)
             }
         );
-        const msg = result.outBinds.result;
+        const msg = result.rows[0].RESULT;
         if (msg.startsWith('ERROR')) {
             return res.status(400).json({ message: msg });
         }
@@ -163,7 +161,7 @@ const toggleUserBan = async (req, res) => {
         // Get current ban status
         const checkResult = await db.execute(
             `SELECT IS_BANNED, USERNAME, ROLE FROM USERS WHERE ID = :id`,
-            { id }, { outFormat: oracledb.OUT_FORMAT_OBJECT }
+            { id }
         );
 
         if (checkResult.rows.length === 0) {
@@ -218,7 +216,7 @@ const changeUserRole = async (req, res) => {
     try {
         const checkResult = await db.execute(
             `SELECT USERNAME FROM USERS WHERE ID = :id`,
-            { id }, { outFormat: oracledb.OUT_FORMAT_OBJECT }
+            { id }
         );
 
         if (checkResult.rows.length === 0) {
@@ -282,7 +280,7 @@ const getAllListings = async (req, res) => {
 
         sql += ` ORDER BY l.CREATED_AT DESC`;
 
-        const result = await db.execute(sql, binds, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const result = await db.execute(sql, binds);
         res.json(result.rows);
     } catch (err) {
         res.status(500).json({ message: 'Error fetching listings', error: err.message });
@@ -296,7 +294,7 @@ const deleteAnyListing = async (req, res) => {
     try {
         // Get listing info for logging
         const listingInfo = await db.execute(
-            `SELECT TITLE FROM LISTINGS WHERE ID = :id`, { id }, { outFormat: oracledb.OUT_FORMAT_OBJECT }
+            `SELECT TITLE FROM LISTINGS WHERE ID = :id`, { id }
         );
 
         await db.execute(`DELETE FROM IMAGES WHERE LISTING_ID = :id`, { id });
@@ -358,7 +356,7 @@ const getAllOffers = async (req, res) => {
             JOIN LISTINGS l ON o.LISTING_ID = l.ID
             ORDER BY o.CREATED_AT DESC
         `;
-        const result = await db.execute(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const result = await db.execute(sql, []);
         res.json(result.rows);
     } catch (err) {
         res.status(500).json({ message: 'Error fetching offers', error: err.message });
@@ -386,14 +384,14 @@ const getCategoryStats = async (req, res) => {
         const sql = `
             SELECT c.ID, c.NAME, 
                    COUNT(l.ID) AS LISTING_COUNT,
-                   NVL(SUM(l.PRICE), 0) AS TOTAL_VALUE,
-                   NVL(ROUND(AVG(l.PRICE), 2), 0) AS AVG_PRICE
+                   COALESCE(SUM(l.PRICE), 0) AS TOTAL_VALUE,
+                   COALESCE(ROUND(AVG(l.PRICE), 2), 0) AS AVG_PRICE
             FROM CATEGORIES c
             LEFT JOIN LISTINGS l ON c.ID = l.CATEGORY_ID AND (l.STATUS = 'active' OR l.STATUS IS NULL)
             GROUP BY c.ID, c.NAME
             ORDER BY LISTING_COUNT DESC
         `;
-        const result = await db.execute(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const result = await db.execute(sql, []);
         res.json(result.rows);
     } catch (err) {
         res.status(500).json({ message: 'Error fetching categories', error: err.message });
@@ -410,7 +408,7 @@ const createCategory = async (req, res) => {
         await db.execute(`INSERT INTO CATEGORIES (NAME) VALUES (:name)`, { name: name.trim() });
         res.status(201).json({ message: 'Category created successfully' });
     } catch (err) {
-        if (err.errorNum === 1) {
+        if (err.code === '23505' || err.errorNum === 1) {
             return res.status(400).json({ message: 'Category already exists' });
         }
         res.status(500).json({ message: 'Error creating category', error: err.message });
@@ -428,7 +426,7 @@ const updateCategory = async (req, res) => {
         await db.execute(`UPDATE CATEGORIES SET NAME = :name WHERE ID = :id`, { name: name.trim(), id });
         res.json({ message: 'Category updated' });
     } catch (err) {
-        if (err.errorNum === 1) {
+        if (err.code === '23505' || err.errorNum === 1) {
             return res.status(400).json({ message: 'Category name already exists' });
         }
         res.status(500).json({ message: 'Error updating category', error: err.message });
@@ -441,8 +439,7 @@ const deleteCategory = async (req, res) => {
     try {
         // Check if category has listings
         const check = await db.execute(
-            `SELECT COUNT(*) AS CNT FROM LISTINGS WHERE CATEGORY_ID = :id`, { id },
-            { outFormat: oracledb.OUT_FORMAT_OBJECT }
+            `SELECT COUNT(*) AS CNT FROM LISTINGS WHERE CATEGORY_ID = :id`, { id }
         );
         if (check.rows[0].CNT > 0) {
             return res.status(400).json({ 
@@ -472,7 +469,7 @@ const getAuditLog = async (req, res) => {
             ORDER BY a.CHANGED_AT DESC
             FETCH FIRST 100 ROWS ONLY
         `;
-        const result = await db.execute(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const result = await db.execute(sql, []);
         res.json(result.rows);
     } catch (err) {
         // Table may not exist yet
@@ -492,7 +489,7 @@ const getAdminActivityLog = async (req, res) => {
             ORDER BY a.ACTION_AT DESC
             FETCH FIRST 100 ROWS ONLY
         `;
-        const result = await db.execute(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const result = await db.execute(sql, []);
         res.json(result.rows);
     } catch (err) {
         // Table may not exist yet
@@ -512,16 +509,16 @@ const getCategoryReport = async (req, res) => {
                    COUNT(l.ID) AS TOTAL_LISTINGS,
                    COUNT(CASE WHEN l.STATUS = 'active' OR l.STATUS IS NULL THEN 1 END) AS ACTIVE_COUNT,
                    COUNT(CASE WHEN l.STATUS = 'sold' THEN 1 END) AS SOLD_COUNT,
-                   NVL(SUM(l.PRICE), 0) AS TOTAL_VALUE,
-                   NVL(ROUND(AVG(l.PRICE), 2), 0) AS AVG_PRICE,
-                   NVL(MIN(l.PRICE), 0) AS MIN_PRICE,
-                   NVL(MAX(l.PRICE), 0) AS MAX_PRICE
+                   COALESCE(SUM(l.PRICE), 0) AS TOTAL_VALUE,
+                   COALESCE(ROUND(AVG(l.PRICE), 2), 0) AS AVG_PRICE,
+                   COALESCE(MIN(l.PRICE), 0) AS MIN_PRICE,
+                   COALESCE(MAX(l.PRICE), 0) AS MAX_PRICE
             FROM CATEGORIES c
             LEFT JOIN LISTINGS l ON c.ID = l.CATEGORY_ID
             GROUP BY c.NAME
             ORDER BY TOTAL_LISTINGS DESC
         `;
-        const result = await db.execute(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const result = await db.execute(sql, []);
         res.json(result.rows);
     } catch (err) {
         res.status(500).json({ message: 'Error fetching report', error: err.message });
@@ -534,7 +531,7 @@ const getTopSellers = async (req, res) => {
         const sql = `
             SELECT u.ID, u.USERNAME, u.EMAIL,
                    COUNT(l.ID) AS LISTING_COUNT,
-                   NVL(SUM(l.PRICE), 0) AS TOTAL_VALUE,
+                   COALESCE(SUM(l.PRICE), 0) AS TOTAL_VALUE,
                    COUNT(CASE WHEN l.STATUS = 'sold' THEN 1 END) AS SOLD_COUNT
             FROM USERS u
             JOIN LISTINGS l ON u.ID = l.SELLER_ID
@@ -542,7 +539,7 @@ const getTopSellers = async (req, res) => {
             ORDER BY LISTING_COUNT DESC
             FETCH FIRST 10 ROWS ONLY
         `;
-        const result = await db.execute(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const result = await db.execute(sql, []);
         res.json(result.rows);
     } catch (err) {
         res.status(500).json({ message: 'Error fetching top sellers', error: err.message });
@@ -557,17 +554,17 @@ const getRecentActivity = async (req, res) => {
                 SELECT 'NEW_LISTING' AS TYPE, l.TITLE AS DESCRIPTION, l.CREATED_AT, u.USERNAME
                 FROM LISTINGS l JOIN USERS u ON l.SELLER_ID = u.ID
                 ORDER BY l.CREATED_AT DESC FETCH FIRST 10 ROWS ONLY
-            `, [], { outFormat: oracledb.OUT_FORMAT_OBJECT }),
+            `, []),
             db.execute(`
                 SELECT 'NEW_OFFER' AS TYPE, l.TITLE || ' (Rs.' || o.OFFER_PRICE || ')' AS DESCRIPTION, 
                        o.CREATED_AT, u.USERNAME
                 FROM OFFERS o JOIN LISTINGS l ON o.LISTING_ID = l.ID JOIN USERS u ON o.BUYER_ID = u.ID
                 ORDER BY o.CREATED_AT DESC FETCH FIRST 10 ROWS ONLY
-            `, [], { outFormat: oracledb.OUT_FORMAT_OBJECT }),
+            `, []),
             db.execute(`
                 SELECT 'NEW_USER' AS TYPE, USERNAME AS DESCRIPTION, CREATED_AT, USERNAME
                 FROM USERS ORDER BY CREATED_AT DESC FETCH FIRST 10 ROWS ONLY
-            `, [], { outFormat: oracledb.OUT_FORMAT_OBJECT })
+            `, [])
         ]);
 
         const all = [
@@ -586,13 +583,13 @@ const getRecentActivity = async (req, res) => {
 const getDBObjects = async (req, res) => {
     try {
         const [tables, views, indexes, procedures, functions, triggers, sequences] = await Promise.all([
-            db.execute(`SELECT TABLE_NAME FROM USER_TABLES ORDER BY TABLE_NAME`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT }),
-            db.execute(`SELECT VIEW_NAME FROM USER_VIEWS ORDER BY VIEW_NAME`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT }),
-            db.execute(`SELECT INDEX_NAME, TABLE_NAME FROM USER_INDEXES WHERE INDEX_TYPE != 'LOB' ORDER BY INDEX_NAME`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT }),
-            db.execute(`SELECT OBJECT_NAME, STATUS FROM USER_OBJECTS WHERE OBJECT_TYPE = 'PROCEDURE' ORDER BY OBJECT_NAME`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT }),
-            db.execute(`SELECT OBJECT_NAME, STATUS FROM USER_OBJECTS WHERE OBJECT_TYPE = 'FUNCTION' ORDER BY OBJECT_NAME`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT }),
-            db.execute(`SELECT TRIGGER_NAME, TABLE_NAME, STATUS FROM USER_TRIGGERS ORDER BY TRIGGER_NAME`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT }),
-            db.execute(`SELECT SEQUENCE_NAME, LAST_NUMBER FROM USER_SEQUENCES ORDER BY SEQUENCE_NAME`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT })
+            db.execute(`SELECT table_name AS TABLE_NAME FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name`, []),
+            db.execute(`SELECT table_name AS VIEW_NAME FROM information_schema.views WHERE table_schema = 'public' ORDER BY table_name`, []),
+            db.execute(`SELECT indexname AS INDEX_NAME, tablename AS TABLE_NAME FROM pg_indexes WHERE schemaname = 'public' ORDER BY indexname`, []),
+            db.execute(`SELECT routine_name AS OBJECT_NAME, 'VALID' AS STATUS FROM information_schema.routines WHERE routine_type = 'PROCEDURE' AND routine_schema = 'public' ORDER BY routine_name`, []),
+            db.execute(`SELECT routine_name AS OBJECT_NAME, 'VALID' AS STATUS FROM information_schema.routines WHERE routine_type = 'FUNCTION' AND routine_schema = 'public' ORDER BY routine_name`, []),
+            db.execute(`SELECT trigger_name AS TRIGGER_NAME, event_object_table AS TABLE_NAME, 'ENABLED' AS STATUS FROM information_schema.triggers WHERE trigger_schema = 'public' ORDER BY trigger_name`, []),
+            db.execute(`SELECT sequence_name AS SEQUENCE_NAME, 0 AS LAST_NUMBER FROM information_schema.sequences WHERE sequence_schema = 'public' ORDER BY sequence_name`, [])
         ]);
 
         res.json({

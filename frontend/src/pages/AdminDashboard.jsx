@@ -195,7 +195,8 @@ const AdminDashboard = () => {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    navigate('/admin/login');
+    window.dispatchEvent(new Event('userProfileUpdate'));
+    navigate('/home');
   };
 
   // ===== Styles =====

@@ -1,5 +1,4 @@
 const db = require('./db');
-const oracledb = require('oracledb');
 
 async function cleanup() {
     await db.initialize();
@@ -41,7 +40,7 @@ async function cleanup() {
         const tables = ['USERS', 'LISTINGS', 'IMAGES', 'WISHLIST', 'OFFERS', 'MESSAGES'];
         for (const table of tables) {
             try {
-                const result = await db.execute(`SELECT COUNT(*) AS CNT FROM ${table}`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+                const result = await db.execute(`SELECT COUNT(*) AS CNT FROM ${table}`, []);
                 console.log(`  ${table}: ${result.rows[0].CNT} rows`);
             } catch (err) {
                 console.log(`  ${table}: error checking - ${err.message}`);

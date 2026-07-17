@@ -4,13 +4,18 @@ const API = 'http://localhost:5000/api';
 async function testAPI() {
     console.log('=== SwapNest Full API Test ===\n');
     let aliceToken, bobToken, aliceId, bobId, listingId, offerId;
+    const suffix = Math.floor(Math.random() * 1000000);
+    const aliceUsername = `Alice_${suffix}`;
+    const aliceEmail = `alice_${suffix}@test.com`;
+    const bobUsername = `Bob_${suffix}`;
+    const bobEmail = `bob_${suffix}@test.com`;
 
     // 1. Signup Alice
     console.log('1. Signup Alice...');
     let res = await fetch(`${API}/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: 'TestAlice', email: 'testalice@test.com', password: 'test123' })
+        body: JSON.stringify({ username: aliceUsername, email: aliceEmail, password: 'test123' })
     });
     let data = await res.json();
     console.log(`   Status: ${res.status}, Message: ${data.message}`);
@@ -21,7 +26,7 @@ async function testAPI() {
     res = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'testalice@test.com', password: 'test123' })
+        body: JSON.stringify({ email: aliceEmail, password: 'test123' })
     });
     data = await res.json();
     aliceToken = data.token;
@@ -100,14 +105,14 @@ async function testAPI() {
     res = await fetch(`${API}/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: 'TestBob', email: 'testbob@test.com', password: 'test123' })
+        body: JSON.stringify({ username: bobUsername, email: bobEmail, password: 'test123' })
     });
     console.log(`   Signup status: ${res.status}`);
     
     res = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'testbob@test.com', password: 'test123' })
+        body: JSON.stringify({ email: bobEmail, password: 'test123' })
     });
     data = await res.json();
     bobToken = data.token;

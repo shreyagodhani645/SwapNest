@@ -6,10 +6,10 @@ async function check() {
         await db.initialize();
         
         console.log("Checking DB connection...");
-        const result = await db.execute("SELECT table_name FROM user_tables", {}, { outFormat: 4002 }); // oracledb.OUT_FORMAT_OBJECT is usually 4002
+        const result = await db.execute("SELECT table_name AS TABLE_NAME FROM information_schema.tables WHERE table_schema = 'public'", {});
         console.log("Tables found:", result.rows.map(r => r.TABLE_NAME));
         
-        const countRes = await db.execute("SELECT COUNT(*) as COUNT FROM LISTINGS", {}, { outFormat: 4002 });
+        const countRes = await db.execute("SELECT COUNT(*) as COUNT FROM LISTINGS", {});
         console.log("Listings count:", countRes.rows[0].COUNT);
     } catch (err) {
         console.error("Diagnostic Error:", err.message);

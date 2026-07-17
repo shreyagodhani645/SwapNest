@@ -1,5 +1,4 @@
 const db = require('../db');
-const oracledb = require('oracledb');
 
 const addToWishlist = async (req, res) => {
     const userId = Number(req.user.id);
@@ -19,7 +18,7 @@ const addToWishlist = async (req, res) => {
     } catch (err) {
         console.error('Wishlist Insert Error:', err);
         // Catch ORA-00001: unique constraint violated
-        if (err.errorNum === 1 || err.message.includes('unique constraint')) {
+        if (err.code === '23505' || err.errorNum === 1 || err.message.includes('unique constraint')) {
             return res.status(400).json({ message: 'Item is already in your wishlist' });
         }
         res.status(500).json({ message: 'Error adding to wishlist', error: err.message });
@@ -65,7 +64,7 @@ const getWishlist = async (req, res) => {
     `;
 
     try {
-        const result = await db.execute(sql, { userId }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const result = await db.execute(sql, { userId });
         res.json(result.rows);
     } catch (err) {
         console.error('Error fetching wishlist:', err);

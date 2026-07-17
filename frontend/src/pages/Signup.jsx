@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { authApi } from '../api/auth';
 
 const Signup = () => {
   const [formData, setFormData] = useState({ username: '', email: '', password: '' });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -31,13 +33,13 @@ const Signup = () => {
     <div className="min-h-screen flex items-center justify-center bg-background dark:bg-gray-950 px-4 py-20 transition-colors duration-300">
       <div className="max-w-md w-full bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-premium dark:shadow-none p-12 border border-blue-50/50 dark:border-gray-800 transition-colors duration-300">
         <div className="text-center mb-10">
-            <div className="inline-flex items-center justify-center h-16 w-16 bg-primary/10 dark:bg-primary/20 rounded-3xl mb-6">
-                <span className="text-primary font-black text-3xl">S</span>
-            </div>
-            <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-2">Create Account</h2>
-            <p className="text-gray-500 dark:text-gray-400 font-medium">Join the SwapNest community today.</p>
+          <div className="inline-flex items-center justify-center h-16 w-16 bg-primary/10 dark:bg-primary/20 rounded-3xl mb-6">
+            <span className="text-primary font-black text-3xl">S</span>
+          </div>
+          <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-2">Create Account</h2>
+          <p className="text-gray-500 dark:text-gray-400 font-medium">Join the SwapNest community today.</p>
         </div>
-        
+
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 mb-8 rounded-r-xl animate-pulse" role="alert">
             <p className="font-bold">Error</p>
@@ -76,17 +78,28 @@ const Signup = () => {
           </div>
           <div>
             <label className="block text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2 ml-1">Password</label>
-            <input
-              type="password"
-              name="password"
-              required
-              autoComplete="new-password"
-              id="signup-password"
-              value={formData.password}
-              className="w-full px-6 py-4 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-950/50 text-gray-900 dark:text-white focus:bg-white dark:focus:bg-gray-900 focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all outline-none"
-              placeholder="••••••••"
-              onChange={handleChange}
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                required
+                autoComplete="new-password"
+                id="signup-password"
+                value={formData.password}
+                className="w-full px-6 py-4 pr-14 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-950/50 text-gray-900 dark:text-white focus:bg-white dark:focus:bg-gray-900 focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all outline-none"
+                placeholder="••••••••"
+                onChange={handleChange}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary transition-colors"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 ml-1">Use at least 6 characters with a mix of letters and numbers.</p>
           </div>
           <button
@@ -99,15 +112,15 @@ const Signup = () => {
         </form>
 
         <div className="mt-10 pt-10 border-t border-gray-50 dark:border-gray-800 text-center">
-            <p className="text-sm font-bold text-gray-400">
-                Already have an account?{' '}
-                <Link to="/login" className="text-primary hover:underline transition-all underline-offset-4">
-                    Log in here
-                </Link>
-            </p>
-            <Link to="/home" className="mt-4 inline-block text-xs font-bold text-gray-400 dark:text-gray-500 hover:text-primary transition-colors">
-                Back to Home
+          <p className="text-sm font-bold text-gray-400">
+            Already have an account?{' '}
+            <Link to="/login" className="text-primary hover:underline transition-all underline-offset-4">
+              Log in here
             </Link>
+          </p>
+          <Link to="/home" className="mt-4 inline-block text-xs font-bold text-gray-400 dark:text-gray-500 hover:text-primary transition-colors">
+            Back to Home
+          </Link>
         </div>
       </div>
     </div>

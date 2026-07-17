@@ -1,5 +1,4 @@
 const db = require('../db');
-const oracledb = require('oracledb');
 
 // POST /api/categories
 const createCategory = async (req, res) => {
@@ -9,19 +8,16 @@ const createCategory = async (req, res) => {
     }
     try {
         // Insert new category, ignore if already exists
-        const sql = `INSERT INTO CATEGORIES (NAME) VALUES (:name) RETURNING ID INTO :id`;
-        const result = await db.execute(sql, {
-            name,
-            id: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
-        });
-        const categoryId = result.outBinds.id[0];
+        const sql = `INSERT INTO CATEGORIES (NAME) VALUES (:name) RETURNING ID`;
+        const result = await db.execute(sql, { name });
+        const categoryId = result.rows[0].ID;
         res.status(201).json({ id: categoryId, name });
     } catch (err) {
-        if (err.message.includes('unique constraint')) {
+        if (err.message.includes('unique constraint') || err.code === '23505') {
             // Category already exists, fetch its ID
             try {
                 const fetchSql = `SELECT ID FROM CATEGORIES WHERE NAME = :name`;
-                const fetchResult = await db.execute(fetchSql, { name }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+                const fetchResult = await db.execute(fetchSql, { name });
                 if (fetchResult.rows.length > 0) {
                     return res.status(200).json({ id: fetchResult.rows[0].ID, name });
                 }

@@ -14,32 +14,40 @@ const signup = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
         const sql = `INSERT INTO USERS (USERNAME, EMAIL, PASSWORD) VALUES (:username, :email, :password)`;
         await db.execute(sql, { username, email, password: hashedPassword });
-        
+
         res.status(201).json({ message: 'User registered successfully' });
     } catch (err) {
-        if (err.errorNum === 1) { // Unique constraint violation in Oracle
+        // Postgres unique violation error code (was Oracle's err.errorNum === 1)
+        if (err.code === '23505') {
             return res.status(400).json({ message: 'Username or Email already exists' });
         }
-        if (err.code === 'NJS-503' || err.message.includes('ECONNREFUSED')) {
-            return res.status(503).json({ message: 'Database is offline. Please ensure Oracle DB is running.' });
+        if (err.message && err.message.includes('ECONNREFUSED')) {
+            return res.status(503).json({ message: 'Database is offline. Please check your connection.' });
         }
         res.status(500).json({ message: 'Error registering user', error: err.message });
     }
 };
 
 const login = async (req, res) => {
-    const { email, password } = req.body;
+    // Accepts either "identifier" (email or username, from the updated Login form)
+    // or a plain "email" field for backwards compatibility with any other callers.
+    const identifier = req.body.identifier || req.body.email;
+    const { password } = req.body;
 
-    if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required' });
+    if (!identifier || !password) {
+        return res.status(400).json({ message: 'Email/username and password are required' });
     }
 
     try {
-        const sql = `SELECT ID, USERNAME, EMAIL, PASSWORD, PHONE, PROFILE_PICTURE, ROLE, IS_BANNED FROM USERS WHERE EMAIL = :email`;
-        const result = await db.execute(sql, { email }, { outFormat: require('oracledb').OUT_FORMAT_OBJECT });
+        const sql = `
+            SELECT ID, USERNAME, EMAIL, PASSWORD, PHONE, PROFILE_PICTURE, ROLE, IS_BANNED 
+            FROM USERS 
+            WHERE EMAIL = :identifier OR USERNAME = :identifier
+        `;
+        const result = await db.execute(sql, { identifier });
 
         if (result.rows.length === 0) {
-            return res.status(404).json({ message: 'Username does not exist, please sign up' });
+            return res.status(404).json({ message: 'Account does not exist, please sign up' });
         }
 
         const user = result.rows[0];
@@ -67,8 +75,8 @@ const login = async (req, res) => {
             user: { id: user.ID, username: user.USERNAME, email: user.EMAIL, phone: user.PHONE || '', PROFILE_PICTURE: user.PROFILE_PICTURE || '', role: user.ROLE || 'user' }
         });
     } catch (err) {
-        if (err.code === 'NJS-503' || err.message.includes('ECONNREFUSED')) {
-            return res.status(503).json({ message: 'Database is offline. Please ensure Oracle DB is running.' });
+        if (err.message && err.message.includes('ECONNREFUSED')) {
+            return res.status(503).json({ message: 'Database is offline. Please check your connection.' });
         }
         res.status(500).json({ message: 'Error logging in', error: err.message });
     }

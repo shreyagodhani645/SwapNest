@@ -1,5 +1,4 @@
 const db = require('../db');
-const oracledb = require('oracledb');
 
 const sendMessage = async (req, res) => {
     const { listingId, receiverId, content } = req.body;
@@ -33,13 +32,13 @@ const getConversation = async (req, res) => {
 
     const sql = `
         SELECT m.ID, m.LISTING_ID, m.SENDER_ID, m.RECEIVER_ID, m.CONTENT, 
-               m.SENT_AT AS CREATED_AT, u.USERNAME as SENDER_NAME
+               m.CREATED_AT, u.USERNAME as SENDER_NAME
         FROM MESSAGES m
         JOIN USERS u ON m.SENDER_ID = u.ID
         WHERE m.LISTING_ID = :listingId
         AND ((m.SENDER_ID = :userId AND m.RECEIVER_ID = :otherUserId)
              OR (m.SENDER_ID = :otherUserId2 AND m.RECEIVER_ID = :userId2))
-        ORDER BY m.SENT_AT ASC
+        ORDER BY m.CREATED_AT ASC
     `;
 
     try {
@@ -49,7 +48,7 @@ const getConversation = async (req, res) => {
             otherUserId: Number(otherUserId),
             otherUserId2: Number(otherUserId),
             userId2: userId
-        }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        });
         res.json(result.rows);
     } catch (err) {
         console.error('Error fetching conversation:', err);
@@ -75,7 +74,7 @@ const getInbox = async (req, res) => {
             userId2: userId, 
             userId3: userId, 
             userId4: userId 
-        }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        });
         res.json(result.rows);
     } catch (err) {
         console.error('Error fetching inbox:', err);
