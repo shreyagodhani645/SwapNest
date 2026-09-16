@@ -154,9 +154,9 @@ app.use((err, req, res, next) => {
 
 async function startServer() {
     await db.initialize();
-    server.listen(PORT, () => {
-        console.log(`Server is running on http://localhost:${PORT}`);
-    });
+    server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is running on http://0.0.0.0:${PORT}`);
+});
 }
 
 startServer().catch(err => {
